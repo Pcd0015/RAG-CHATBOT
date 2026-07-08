@@ -1,0 +1,64 @@
+Company Knowledge Base: Internal Engineering Notes
+====================================================
+
+Section 1: Deployment Process
+------------------------------
+All production deployments must go through the staging environment first.
+The staging environment mirrors production configuration but uses a separate
+database. Deployments are triggered via the internal CI/CD pipeline by
+merging to the `release` branch. A deployment requires sign-off from at
+least one senior engineer and must pass all automated tests, including the
+integration test suite which takes approximately 12 minutes to run.
+
+Rollbacks can be triggered within 30 minutes of a deployment using the
+`rollback.sh` script, which restores the previous container image and
+database migration state. After 30 minutes, a manual rollback plan is
+required and must be reviewed by the on-call lead.
+
+Section 2: API Rate Limits
+----------------------------
+The public API enforces a rate limit of 1000 requests per minute per API key
+for standard tier customers, and 5000 requests per minute for enterprise
+tier customers. Requests that exceed the limit receive an HTTP 429 response
+with a `Retry-After` header indicating how many seconds to wait.
+
+Internal service-to-service calls are not subject to these rate limits but
+are monitored for anomalous traffic patterns through the internal
+observability dashboard.
+
+Section 3: On-Call Rotation
+------------------------------
+The on-call rotation runs on a weekly basis, starting every Monday at 9 AM
+in the primary engineering timezone. Each on-call engineer is responsible
+for triaging incoming alerts within 15 minutes during business hours and
+30 minutes outside business hours. Escalation to a secondary on-call
+engineer happens automatically if an alert is not acknowledged within the
+response window.
+
+Critical severity incidents (Sev-1) require the on-call engineer to open an
+incident channel, notify the engineering lead, and begin a public status
+page update within 10 minutes of detection.
+
+Section 4: Data Retention Policy
+-----------------------------------
+User activity logs are retained for 90 days before being automatically
+archived to cold storage. Archived logs are kept for an additional 2 years
+before permanent deletion, in accordance with the company's data retention
+policy. Customers on the enterprise tier may request custom retention
+periods, subject to legal review.
+
+Personally identifiable information (PII) is encrypted at rest using
+AES-256 and is never included in analytics exports or third-party
+integrations without explicit customer consent.
+
+Section 5: Local Development Setup
+--------------------------------------
+New engineers should clone the monorepo and run the `setup.sh` script,
+which installs dependencies, configures pre-commit hooks, and provisions a
+local development database using Docker Compose. The full setup process
+typically takes 10-15 minutes on a standard laptop.
+
+Environment variables required for local development are documented in
+`.env.example` at the root of the repository. Engineers should never commit
+real API keys or secrets to version control; use the internal secrets
+manager for anything beyond local testing.
