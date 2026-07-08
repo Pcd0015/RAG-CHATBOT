@@ -1,12 +1,12 @@
 """
 Central configuration for the RAG chatbot.
-Updated for Google Gemini with Streamlit Secrets support.
+Updated for current Gemini production models (July 2026).
 """
 import os
 import streamlit as st
 from dotenv import load_dotenv
 
-# Load local .env file if it exists (for local development)
+# Load local .env file if it exists
 load_dotenv()
 
 # --- API keys ---
@@ -14,8 +14,9 @@ load_dotenv()
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY", "")
 
 # --- Models ---
-# Using a stable, widely available model string
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+# UPDATED: gemini-1.5-flash is deprecated. 
+# Using gemini-3.5-flash (the current stable production default for 2026).
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 
 # --- Paths ---
