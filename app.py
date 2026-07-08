@@ -1,20 +1,21 @@
-"""
-app.py
-------
-Streamlit web UI for the RAG chatbot: upload documents, ingest them into the
-vector store, and chat with citations shown per answer.
-
-Usage:
-    streamlit run app.py
-"""
 import os
 import streamlit as st
-
 import config
 from ingest import load_documents, chunk_documents, build_vector_store
 
 st.set_page_config(page_title="RAG Chatbot", page_icon="📚", layout="wide")
 
+# --- AUTO-INGESTION LOGIC (Self-Healing on Cloud) ---
+if not os.path.exists(config.CHROMA_PATH):
+    st.info("Vector store not found. Initializing ingestion of data/ directory...")
+    if os.path.exists(config.DATA_DIR) and len(os.listdir(config.DATA_DIR)) > 0:
+        with st.spinner("Building vector index for the first time..."):
+            docs = load_documents(config.DATA_DIR)
+            chunks = chunk_documents(docs)
+            build_vector_store(chunks)
+        st.success("Vector index built successfully!")
+    else:
+        st.warning(f"No documents found in {config.DATA_DIR}. Please upload files in the sidebar.")
 
 def get_pipeline():
     from rag_pipeline import RAGPipeline
@@ -25,7 +26,6 @@ def get_pipeline():
             st.session_state.pipeline = None
             st.session_state.pipeline_error = str(e)
     return st.session_state.get("pipeline")
-
 
 # ---------------- Sidebar: document management ----------------
 with st.sidebar:
@@ -47,8 +47,8 @@ with st.sidebar:
             docs = load_documents(config.DATA_DIR)
             chunks = chunk_documents(docs)
             build_vector_store(chunks)
-        st.success(f"Ingested {len(uploaded_files)} file(s). Reloading pipeline...")
-        st.session_state.pop("pipeline", None)  # force reload with fresh index
+        st.success(f"Ingested {len(uploaded_files)} file(s). Reloading...")
+        st.session_state.pop("pipeline", None)
         st.rerun()
 
     st.divider()
@@ -57,33 +57,21 @@ with st.sidebar:
         st.caption(f"**{len(files)} file(s)** currently indexed:")
         for f in files:
             st.caption(f"• {f}")
-    else:
-        st.caption("No documents indexed yet.")
 
     st.divider()
-    # UPDATED: References to GEMINI_MODEL
     st.caption(f"Model: `{config.GEMINI_MODEL}`")
     st.caption(f"Embeddings: `{config.EMBEDDING_MODEL}`")
-    st.caption(f"Top-K retrieved chunks: `{config.TOP_K}`")
 
     if st.button("🗑️ Clear chat history"):
         st.session_state.messages = []
         st.rerun()
 
-
 # ---------------- Main chat area ----------------
 st.title("📚 RAG Chatbot")
-st.caption("Ask questions grounded in your own document collection.")
-
 pipeline = get_pipeline()
 
 if pipeline is None:
-    st.warning(
-        f"**Not ready yet:** {st.session_state.get('pipeline_error', 'Unknown error')}\n\n"
-        "1. Ensure `.env` is configured with your `GEMINI_API_KEY`.\n"
-        "2. Upload documents in the sidebar, or add files to the `data/` folder "
-        "and run `python ingest.py`."
-    )
+    st.warning(f"**Not ready:** {st.session_state.get('pipeline_error', 'Waiting for API Key...')}")
     st.stop()
 
 if "messages" not in st.session_state:
@@ -95,8 +83,7 @@ for msg in st.session_state.messages:
         if msg["role"] == "assistant" and msg.get("sources"):
             with st.expander("📎 Sources"):
                 for s in msg["sources"]:
-                    st.markdown(f"**{s.filename}** (relevance: {s.score})")
-                    st.caption(s.snippet[:300] + ("..." if len(s.snippet) > 300 else ""))
+                    st.markdown(f"**{s.filename}** (score: {s.score:.2f})")
 
 if question := st.chat_input("Ask a question about your documents..."):
     st.session_state.messages.append({"role": "user", "content": question})
@@ -106,14 +93,13 @@ if question := st.chat_input("Ask a question about your documents..."):
     history = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages[:-1]]
 
     with st.chat_message("assistant"):
-        with st.spinner("Retrieving relevant context and generating answer..."):
+        with st.spinner("Generating answer..."):
             result = pipeline.query(question, chat_history=history)
         st.markdown(result.answer)
         if result.sources:
             with st.expander("📎 Sources"):
                 for s in result.sources:
-                    st.markdown(f"**{s.filename}** (relevance: {s.score})")
-                    st.caption(s.snippet[:300] + ("..." if len(s.snippet) > 300 else ""))
+                    st.markdown(f"**{s.filename}** (score: {s.score:.2f})")
 
     st.session_state.messages.append(
         {"role": "assistant", "content": result.answer, "sources": result.sources}
