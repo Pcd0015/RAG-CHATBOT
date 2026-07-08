@@ -77,14 +77,18 @@ if pipeline is None:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Display chat history
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
         if msg["role"] == "assistant" and msg.get("sources"):
             with st.expander("📎 Sources"):
                 for s in msg["sources"]:
+                    # Note: Depending on your Source dataclass structure, 
+                    # adjust s.score to be accessible
                     st.markdown(f"**{s.filename}** (score: {s.score:.2f})")
 
+# Handle new user input
 if question := st.chat_input("Ask a question about your documents..."):
     st.session_state.messages.append({"role": "user", "content": question})
     with st.chat_message("user"):
@@ -94,13 +98,19 @@ if question := st.chat_input("Ask a question about your documents..."):
 
     with st.chat_message("assistant"):
         with st.spinner("Generating answer..."):
+            # Result is a RAGResponse object
             result = pipeline.query(question, chat_history=history)
-        st.markdown(result.answer)
-        if result.sources:
-            with st.expander("📎 Sources"):
-                for s in result.sources:
-                    st.markdown(f"**{s.filename}** (score: {s.score:.2f})")
+            
+            # Explicitly display only the answer string
+            st.markdown(result.answer)
+            
+            # Display sources if available
+            if result.sources:
+                with st.expander("📎 Sources"):
+                    for s in result.sources:
+                        st.markdown(f"**{s.filename}** (score: {s.score:.2f})")
 
+    # Store assistant response as string (result.answer) not the object
     st.session_state.messages.append(
         {"role": "assistant", "content": result.answer, "sources": result.sources}
     )
