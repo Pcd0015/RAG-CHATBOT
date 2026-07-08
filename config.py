@@ -8,17 +8,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- API keys ---
-# Now looking for GEMINI_API_KEY instead of ANTHROPIC_API_KEY
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # --- Models ---
-# Updated to use Gemini models
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 
 # --- Paths ---
 DATA_DIR = os.getenv("DATA_DIR", "data")
 CHROMA_DIR = os.getenv("CHROMA_DIR", "chroma_db")
+# Added CHROMA_PATH to match app.py requirements
+CHROMA_PATH = os.getenv("CHROMA_PATH", "chroma_db")
 COLLECTION_NAME = "rag_chatbot_collection"
 
 # --- Chunking ---
