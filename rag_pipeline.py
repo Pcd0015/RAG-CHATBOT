@@ -32,7 +32,12 @@ class RAGPipeline:
         if not os.path.isdir(config.CHROMA_DIR):
             raise RuntimeError(f"No vector store found at '{config.CHROMA_DIR}'.")
 
-        self.embeddings = HuggingFaceEmbeddings(model_name=config.EMBEDDING_MODEL)
+        # FIX: Added model_kwargs={'device': 'cpu'} to resolve meta-tensor initialization error
+        self.embeddings = HuggingFaceEmbeddings(
+            model_name=config.EMBEDDING_MODEL,
+            model_kwargs={'device': 'cpu'}
+        )
+        
         self.vectordb = Chroma(
             collection_name=config.COLLECTION_NAME,
             embedding_function=self.embeddings,

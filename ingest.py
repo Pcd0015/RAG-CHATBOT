@@ -4,11 +4,6 @@ ingest.py
 Loads every supported document from DATA_DIR, splits them into overlapping
 chunks, embeds each chunk with a local sentence-transformers model, and
 persists everything into a Chroma vector database on disk.
-
-Run this once whenever you add or change documents:
-
-    python ingest.py
-    python ingest.py --reset      # wipe the DB and rebuild from scratch
 """
 import argparse
 import os
@@ -83,7 +78,11 @@ def chunk_documents(docs):
 
 def build_vector_store(chunks, reset: bool = False):
     """Embed chunks and persist them into a local Chroma collection."""
-    embeddings = HuggingFaceEmbeddings(model_name=config.EMBEDDING_MODEL)
+    # FIX: Added model_kwargs={'device': 'cpu'} to resolve NotImplementedError
+    embeddings = HuggingFaceEmbeddings(
+        model_name=config.EMBEDDING_MODEL,
+        model_kwargs={'device': 'cpu'}
+    )
 
     if reset and os.path.isdir(config.CHROMA_DIR):
         import shutil
