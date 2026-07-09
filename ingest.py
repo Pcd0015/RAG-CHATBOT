@@ -9,6 +9,7 @@ import argparse
 import os
 import sys
 import time
+import shutil
 
 from langchain_community.document_loaders import (
     DirectoryLoader,
@@ -24,7 +25,7 @@ import config
 
 
 def load_documents(data_dir: str):
-    """Load .pdf, .txt, and .md files from data_dir using the right loader for each type."""
+    """Load .pdf, .txt, and .md files from data_dir."""
     if not os.path.isdir(data_dir) or not os.listdir(data_dir):
         print(f"No files found in '{data_dir}'. Add documents there and re-run.")
         sys.exit(1)
@@ -68,7 +69,6 @@ def chunk_documents(docs):
     )
     chunks = splitter.split_documents(docs)
 
-    # Ensure every chunk carries a clean "source" filename for citations later.
     for chunk in chunks:
         src = chunk.metadata.get("source", "unknown")
         chunk.metadata["source"] = os.path.basename(src)
@@ -78,14 +78,13 @@ def chunk_documents(docs):
 
 def build_vector_store(chunks, reset: bool = False):
     """Embed chunks and persist them into a local Chroma collection."""
-    # FIX: Added model_kwargs={'device': 'cpu'} to resolve NotImplementedError
+    # Explicitly set device to 'cpu' to avoid meta-tensor initialization errors
     embeddings = HuggingFaceEmbeddings(
         model_name=config.EMBEDDING_MODEL,
         model_kwargs={'device': 'cpu'}
     )
 
     if reset and os.path.isdir(config.CHROMA_DIR):
-        import shutil
         shutil.rmtree(config.CHROMA_DIR)
         print(f"Cleared existing vector store at '{config.CHROMA_DIR}'")
 
@@ -95,7 +94,6 @@ def build_vector_store(chunks, reset: bool = False):
         persist_directory=config.CHROMA_DIR,
     )
 
-    # Batch adds to avoid overwhelming memory on very large corpora
     batch_size = 100
     total = len(chunks)
     for i in range(0, total, batch_size):
@@ -120,14 +118,13 @@ def main():
 
     print("Chunking documents ...")
     chunks = chunk_documents(docs)
-    print(f"Created {len(chunks)} chunks (chunk_size={config.CHUNK_SIZE}, overlap={config.CHUNK_OVERLAP}).")
+    print(f"Created {len(chunks)} chunks.")
 
-    print("Embedding and storing in ChromaDB (first run downloads the embedding model) ...")
+    print("Embedding and storing in ChromaDB ...")
     build_vector_store(chunks, reset=args.reset)
 
     elapsed = time.time() - start
     print(f"\nDone in {elapsed:.1f}s. Vector store persisted at '{config.CHROMA_DIR}'.")
-    print("You can now run: python cli.py   OR   streamlit run app.py")
 
 
 if __name__ == "__main__":

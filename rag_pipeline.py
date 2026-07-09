@@ -32,7 +32,8 @@ class RAGPipeline:
         if not os.path.isdir(config.CHROMA_DIR):
             raise RuntimeError(f"No vector store found at '{config.CHROMA_DIR}'.")
 
-        # FIX: Added model_kwargs={'device': 'cpu'} to resolve meta-tensor initialization error
+        # Explicitly setting device='cpu' prevents meta-tensor initialization errors
+        # in environments where the model might otherwise default to an empty shell.
         self.embeddings = HuggingFaceEmbeddings(
             model_name=config.EMBEDDING_MODEL,
             model_kwargs={'device': 'cpu'}
@@ -48,6 +49,7 @@ class RAGPipeline:
             model=config.GEMINI_MODEL,
             google_api_key=config.GEMINI_API_KEY,
             temperature=config.TEMPERATURE,
+            max_tokens=config.MAX_TOKENS,
         )
 
     def retrieve(self, question: str, k: int = None) -> List[Source]:
@@ -65,7 +67,7 @@ class RAGPipeline:
         last_role = None
         for turn in chat_history or []:
             current_role = turn["role"]
-            if current_role == last_role: continue # Skip if sequence is broken
+            if current_role == last_role: continue 
             
             if current_role == "user":
                 msgs.append(HumanMessage(content=turn["content"]))
@@ -83,15 +85,12 @@ class RAGPipeline:
         context = self._build_context(sources)
         user_turn = f"Context from documents:\n\n{context}\n\n---\n\nQuestion: {question}"
 
-        # Build message sequence: System -> Filtered History -> Latest User Message
         messages = [SystemMessage(content=config.SYSTEM_PROMPT)]
         messages.extend(self._build_history_messages(chat_history))
         
-        # Ensure the very last message is always a HumanMessage
         if not messages or not isinstance(messages[-1], HumanMessage):
             messages.append(HumanMessage(content=user_turn))
         else:
-            # If the last message was somehow already a HumanMessage, just append content
             messages[-1].content += f"\n\n{user_turn}"
 
         try:
