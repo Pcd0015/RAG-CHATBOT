@@ -33,7 +33,6 @@ class RAGPipeline:
             raise RuntimeError(f"No vector store found at '{config.CHROMA_DIR}'.")
 
         # Explicitly setting device='cpu' prevents meta-tensor initialization errors
-        # in environments where the model might otherwise default to an empty shell.
         self.embeddings = HuggingFaceEmbeddings(
             model_name=config.EMBEDDING_MODEL,
             model_kwargs={'device': 'cpu'}
@@ -95,7 +94,14 @@ class RAGPipeline:
 
         try:
             response = self.llm.invoke(messages)
-            return RAGResponse(answer=response.content, sources=sources)
+            
+            # Extract text from content if it is returned as a list of dicts
+            if isinstance(response.content, list):
+                final_answer = "".join([block.get("text", "") for block in response.content if isinstance(block, dict)])
+            else:
+                final_answer = response.content
+
+            return RAGResponse(answer=final_answer, sources=sources)
         except Exception as e:
             print(f"CRITICAL GEMINI ERROR: {e}")
             raise e
