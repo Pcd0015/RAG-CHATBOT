@@ -9,7 +9,7 @@ with citations, not hallucinations.
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
 [![LangChain](https://img.shields.io/badge/LangChain-Orchestration-1C3C3C?style=flat&logo=langchain&logoColor=white)](https://www.langchain.com/)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20Store-FF6F61?style=flat)](https://www.trychroma.com/)
-[![Claude](https://img.shields.io/badge/Claude-Anthropic%20API-D97757?style=flat)](https://www.anthropic.com/)
+[![Gemini](https://img.shields.io/badge/Gemini-Google%20AI-4285F4?style=flat&logo=googlegemini&logoColor=white)](https://ai.google.dev/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-Web%20UI-FF4B4B?style=flat&logo=streamlit&logoColor=white)](https://streamlit.io/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -35,9 +35,10 @@ retrieved context*.
 This project is a complete, working implementation of that pattern — not a
 toy demo. It ingests real documents (PDF, TXT, Markdown), chunks and embeds
 them into a vector database, retrieves the most relevant chunks for any
-question, and generates a grounded, cited answer using Claude. It ships with
-both a terminal interface and a full web UI, and it's structured the way a
-production RAG service would be: config-driven, modular, and documented.
+question, and generates a grounded, cited answer using **Google's Gemini
+API**. It ships with both a terminal interface and a full web UI, and it's
+structured the way a production RAG service would be: config-driven,
+modular, and documented.
 
 **Try it now:** 👉 **[pcd0015-rag-chatbot-app-9rph54.streamlit.app](https://pcd0015-rag-chatbot-app-9rph54.streamlit.app/)**
 
@@ -54,6 +55,7 @@ production RAG service would be: config-driven, modular, and documented.
 - 🚫 **Hallucination guardrails** — the system prompt forces the model to say "I don't know" instead of guessing when context is insufficient
 - 🖥️ **Two interfaces** — a scriptable CLI and a polished Streamlit web app with drag-and-drop document upload
 - ⚙️ **Fully configurable** — model, chunk size, overlap, and retrieval depth are all environment variables, no code changes needed
+- 💸 **Low-cost generation** — runs on Gemini's free-tier-friendly API, keeping this cheap to host and demo
 
 ---
 
@@ -75,14 +77,14 @@ flowchart TD
         E["🙋 User Question"] --> F["🔎 Similarity Search<br/>top-K relevant chunks"]
         D -.retrieves from.-> F
         F --> G["📋 Context Builder<br/>chunks + chat history +<br/>system prompt"]
-        G --> H["🤖 Claude LLM<br/>Anthropic API"]
+        G --> H["✨ Gemini LLM<br/>Google AI API"]
         H --> I["✅ Grounded Answer<br/>+ Source Citations"]
     end
 
     style A fill:#e8f0fe,stroke:#4285f4
     style D fill:#fff3e0,stroke:#ff6f00
     style E fill:#e8f0fe,stroke:#4285f4
-    style H fill:#fce4ec,stroke:#d97757
+    style H fill:#e8f0fe,stroke:#4285f4
     style I fill:#e6f4ea,stroke:#34a853
 ```
 
@@ -91,8 +93,9 @@ flowchart TD
 | Design choice | Why |
 |---|---|
 | Chunking with overlap (1000 / 150) | Preserves context across chunk boundaries so answers aren't cut off mid-thought |
-| Local embeddings (`all-MiniLM-L6-v2`) | Ingestion is free and works offline — only the final answer generation step calls a paid API |
+| Local embeddings (`all-MiniLM-L6-v2`) | Ingestion is free and works offline — only the final answer generation step calls a paid/rate-limited API |
 | ChromaDB persisted to disk | Embed once, query many times, without re-processing documents on every run |
+| Gemini for generation | Fast, low-cost, generous free tier — good fit for a demo/portfolio deployment |
 | Relevance-scored citations | Every answer is auditable — you can see exactly which document and passage it came from |
 | Grounded system prompt | Explicitly instructs the model to decline rather than hallucinate when context is insufficient |
 
@@ -106,7 +109,7 @@ flowchart TD
 | Orchestration | LangChain |
 | Vector Database | ChromaDB |
 | Embeddings | Sentence-Transformers (`all-MiniLM-L6-v2`), local & free |
-| LLM | Claude (Anthropic API) |
+| LLM | Google Gemini (`gemini-3.5-flash`) via `langchain-google-genai` |
 | Web UI | Streamlit |
 | Document Loaders | PyPDF, Unstructured (Markdown), native TextLoader |
 
@@ -135,7 +138,7 @@ rag_chatbot/
 
 ### Prerequisites
 - Python 3.10 or higher
-- An [Anthropic API key](https://console.anthropic.com/)
+- A [Google AI Studio API key](https://aistudio.google.com/app/apikey) (free tier available)
 
 ### 1. Clone the repository
 ```bash
@@ -156,7 +159,7 @@ cp .env.example .env
 ```
 Then open `.env` and set:
 ```
-ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=your_google_api_key_here
 ```
 
 ### 4. Add your documents
@@ -220,12 +223,12 @@ questions correctly flagged as "not found in the provided context."
 
 | Want to... | Change this |
 |---|---|
-| Use a bigger/cheaper Claude model | `ANTHROPIC_MODEL` in `.env` |
+| Use a different Gemini model (e.g. `gemini-2.5-pro`) | `GEMINI_MODEL` in `.env` |
 | Support more file types (e.g. `.docx`, `.html`) | Add a loader to `ingest.py`'s `loaders` list (LangChain ships 100+ built-in loaders) |
 | Retrieve more/fewer chunks per answer | `TOP_K` in `.env` |
 | Larger/smaller chunks | `CHUNK_SIZE` / `CHUNK_OVERLAP` in `.env` |
 | Swap ChromaDB for Pinecone/FAISS | Replace the `Chroma(...)` calls in `ingest.py` and `rag_pipeline.py` — LangChain's vector store interface is consistent across providers |
-| Use OpenAI instead of Claude | Swap `ChatAnthropic` for `ChatOpenAI` in `rag_pipeline.py` |
+| Use Claude or OpenAI instead of Gemini | Swap `ChatGoogleGenerativeAI` for `ChatAnthropic` / `ChatOpenAI` in `rag_pipeline.py` |
 | Improve retrieval precision | Add a cross-encoder re-ranking step after `retrieve()` in `rag_pipeline.py` |
 
 ---
@@ -274,7 +277,7 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 - [LangChain](https://www.langchain.com/) for orchestration primitives
 - [ChromaDB](https://www.trychroma.com/) for the vector store
-- [Anthropic](https://www.anthropic.com/) for the Claude API
+- [Google AI](https://ai.google.dev/) for the Gemini API
 - [Sentence-Transformers](https://www.sbert.net/) for local embeddings
 
 <div align="center">
